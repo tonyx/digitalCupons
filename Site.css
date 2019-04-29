@@ -9,7 +9,8 @@ body
 {
 	font-family: Arial, Helvetica, sans-serif;
     font-size: 14px;
-    background-color: #96d1d2;
+    /* background-color: #96d1d2; */
+    background-color:#47afdd;
 	padding: 0px 6%;
 }
 
@@ -35,6 +36,9 @@ body
 	width: 100%;
 	border-bottom: 1px dotted #5D5A53;
 	margin-bottom: 10px;
+	background: url(fioresea.png) no-repeat;
+	-webkit-background-clip: padding-box;
+	/* background-image: "fioresea.png"; */
 }
 
 #header h1
@@ -44,7 +48,9 @@ body
 	font-size: 18px;
 	float: left;
 	/* background: url(logo.png) no-repeat; */
-	/* background: url(logo.jpeg) no-repeat; */
+	/* background: url(fioresea.png) no-repeat; */
+	/* background: url(fioresea.png) no-repeat; */
+	/* background-image:  fioresea.png; */
 	padding: 100px 100px 5px 10px;
 }
 
