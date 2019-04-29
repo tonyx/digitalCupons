@@ -28,6 +28,7 @@ open Newtonsoft.Json
 open PayPalCheckoutSdk.Core
 open PayPalCheckoutSdk.Orders
 open System.Globalization
+open System.Drawing
 
 open BraintreeHttp
 
@@ -37,6 +38,14 @@ type Settings = AppSettings<"App.config">
 type dummy = {a: string}
 
 let log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
+let englishLocal = DigitalCupons.LocalSchema.Resource.Load ("resources-en.xml")
+let italianLocal = DigitalCupons.LocalSchema.Resource.Load ("resources-it.xml")
+
+let defaultLocal = DigitalCupons.LocalSchema.Resource.Load ("resources-"+Settings.Localization+".xml")
+
+let mapOfLocals = [("it",italianLocal);("en",englishLocal)] |> Map.ofList   
+
 
 type UserLoggedOnSession = {
     UserId: int
@@ -64,6 +73,10 @@ let session f =
                 f (UserLoggedOn {Username = username; Role = role; UserId = id  })
             | _ -> 
                 f NoSession)
+
+
+// setLanguage strLanguage =
+
 
 
 
@@ -94,7 +107,7 @@ let session f =
 
 
 let html container =
-    let result  user =
+    let result user =
         OK (View.index 
                 (View.partUser user) 
                 container)
@@ -112,6 +125,8 @@ let html container =
 let home (userLoggedOnSession:UserLoggedOnSession) = warbler (fun _ ->
     let welcomeMessage = LiteDb.getCurrentMessages() |> List.tryHead
     View.home userLoggedOnSession.UserId userLoggedOnSession.Role welcomeMessage Settings.NodeService  |> html)
+
+
 
 
 let bindToForm form handler =
@@ -148,6 +163,15 @@ let authenticateUser (user: User) =
             >=> store.set  "id" (user.Id ))
     >=> returnPathOrHome
 
+let changeLocal (langCode:string)  =
+    log.Debug(sprintf "change local to %s" langCode)
+    session (function | _ -> succeed)
+    >=> sessionStore (fun store ->
+        log.Debug("sessionstore")
+        store.set "lang" langCode
+    ) >=>
+    Redirection.FOUND (sprintf Path.Cupon.lookForCuponPage langCode)
+
 
 let authenticateUserAndGoToUrl (user: User) url =
     authenticated Cookie.CookieLife.Session false
@@ -171,19 +195,6 @@ let logon =
                     authenticateUser user
             | _ ->
                 View.logon "Nome utente o password non valida." |> html
-        )
-    ]
-
-let galardoLogon =
-    choose [
-        GET >=> (View.logon "" |> html)
-        POST >=> bindToForm Form.galardoLogon (fun form ->
-            let (Password password) = form.Password
-            match validateUser form.Username  password  with
-            | Some user ->
-                    authenticateUser user
-            | _ ->
-                    View.logon "Username or password is invalid." |> html
         )
     ]
 
@@ -217,6 +228,7 @@ let anyUserLoggedOn f_success =
         | UserLoggedOn X -> f_success X
         | _ -> UNAUTHORIZED "Not logged in"
     ))
+
 
 let get64EncodedImageFromStorage name =
     let image = LiteDb.getImage name
@@ -365,9 +377,6 @@ let payWithPayPal orderId =
     
 
 
-
-
-
 let confirmOrder orderId =
     let order = LiteDb.getOrderById orderId
     let orderOwnerId = order.User.Id
@@ -409,7 +418,7 @@ let addItemFromDetailedMenu orderId courseId  pageNumber=
 
 
 let makeOrderAsDoneRef orderId =
-    log.Debug("entrato 1")
+    log.Debug(printf " makeOrderAsDoneRef %d " orderId)
     LiteDb.makeOrderAsDone orderId
 
     let order = LiteDb.getOrderById orderId
@@ -493,7 +502,6 @@ let editOrderItem orderItemId (userLoggedOn: UserLoggedOnSession)=
 
 let manageConfirmedOrder orderId =
     let order = LiteDb.getOrderById orderId
-    // let userHasEmail = match order.User.UserEmail with | Some _ -> true | None -> false
 
     choose [
         GET >=> warbler (fun _ ->
@@ -1181,6 +1189,8 @@ type RecognizeCuponModel = {recognize: bool;serverAddress: string;
 let error = 
     View.error |> html
 
+let noMoreCuponByThisUser =
+    View.noMoreCuponByThisUser |> html
 
 let detectCuponRef cuponGuidString = warbler (fun _ ->
     let lookedUpCupon = LiteDb.findCuponByGuid cuponGuidString
@@ -1241,8 +1251,9 @@ let adminCupons =
 
             let initTime = System.DateTime.Parse(form.DateInit,CultureInfo.CreateSpecificCulture("en-US"))
             let endingTime = System.DateTime.Parse(form.DateEnding,CultureInfo.CreateSpecificCulture("en-US"))
+            let adjustedEndingTime = endingTime.AddDays((float)1)
 
-            let slots = LiteDb.getExistingSlotsOfAPeriod initTime  endingTime |> Seq.toList
+            let slots = LiteDb.getExistingSlotsOfAPeriod initTime  adjustedEndingTime |> Seq.toList
             log.Debug(sprintf "grandezza slot size: %d" (List.length slots))
             let newCuponGroup = { Quantity=(int)form.NumberOfCupon; NumberOfPeople=(int)form.NumberOfPeople;
                 DiscountType =  form.TypeOfDiscount; DiscountAmount = form.DiscountValue; NumberOfCupons = (int)form.NumberOfCupon; 
@@ -1267,12 +1278,14 @@ let removePeriodicalExcursion id =
     Redirection.FOUND Path.Admin.adminExcursions
 
 
-let lookForCuponPage = warbler ( fun _ ->
+let lookForCuponPage lang = warbler ( fun _ ->
+
+    // let customLocal = match Map.tryFind(lang) mapOfLocals  with | Some X -> X | _ -> defaultLocal
 
     let now = System.DateTime.Now
     let unclaimedCupons = LiteDb.getUnclaimedCuponsWithSomSlotsStartingFrom now |> Seq.toList
 
-    View.lookForCuponPage unclaimedCupons |> html
+    View.lookForCuponPage unclaimedCupons lang |> html
 )
 
 
@@ -1434,8 +1447,8 @@ let rec datesOfAnInterval (visitTime: System.DateTime) (startingDate:System.Date
             else datesOfAnInterval visitTime (startingDate.AddDays((float)1)) endingDate daysOfWeek  accumulator
     )
 
-let viewCupons =  warbler (fun _ ->
 
+let viewCupons =  warbler (fun _ ->
         let allCupons = getAllValidCupons() |> Seq.toList
         View.viewCupons allCupons |> html 
     )
@@ -1540,38 +1553,74 @@ let claimCupon id =
     choose [
         GET >=> warbler ( fun _ ->
             DotLiquid.page("claimCupon.html") {a=""}
-            // View.claimCupon cupon |> html
         )
         POST >=> bindToForm Form.subscribeForCupon (fun form ->
+
             let cupon = {cupon with OwnerEmail = Some form.Email}
-            LiteDb.updateCupon (cupon) |> ignore
+
+
+            let areadyAskedCupon = LiteDb.thereAreActiveCuponByThisEmail form.Email
+
+            if (areadyAskedCupon) then
+                Redirection.FOUND Path.Cupon.noMoreCuponByThisUser
+            else  
             
+            // must update only if email is sent
+            LiteDb.updateCupon (cupon) |> ignore
+            let cuponQrCode64Encoded = Utils.stringToBase64Qr (cupon.CuponGuid.ToString())
+            let cuponImg = Utils.stringToImageQr (cupon.CuponGuid.ToString())
+
+// <img src="data:image/bmp;base64, {{model.qr_base64_encoded_url}} " width="400"/>
+            // remove spooled bmp files
+            let filesToBeRemoved = System.IO.Directory.GetFiles(".","*.bmp")
+            let _ = filesToBeRemoved |> Array.iter  (fun x -> System.IO.File.Delete(x))
+
+            let cuponTimes = cupon.Slots |> List.map (fun (x:LiteDb.Slot) -> x.DateTime)
+            let cuponText = cuponTimes |> List.fold (fun acc x -> acc + (x.ToString())+", " ) ""
+
             let sendEmail = 
                 async {
-                    try 
-                        let smtpClient = new SmtpClient(Settings.SmtpAddress,Settings.SmtpPort)
-                        smtpClient.Credentials <- System.Net.NetworkCredential(Settings.SmtpCredentialsName,Settings.SmtpCredentialsPassword)
-                        smtpClient.DeliveryMethod <- SmtpDeliveryMethod.Network
-                        smtpClient.EnableSsl <- true
-                        let mail = new MailMessage()
-                        mail.From <- MailAddress(Settings.OwnerEmail,"Capri Island Tour")
-                        mail.To.Add(form.Email)
-                        mail.Subject <- "cupon"
-                        mail.Body <- "cupon richiesto"
-                        smtpClient.Send(mail)
-                        LiteDb.updateCupon (cupon) |> ignore
-                    with err -> 
-                        // Redirection.FOUND Path.Cupon.error 
-                        log.Error ((err.ToString())+" errore nel tentativo di spedire il cupon")
+                    let smtpClient = new SmtpClient(Settings.SmtpAddress,Settings.SmtpPort)
+                    smtpClient.Credentials <- System.Net.NetworkCredential(Settings.SmtpCredentialsName,Settings.SmtpCredentialsPassword)
+                    smtpClient.DeliveryMethod <- SmtpDeliveryMethod.Network
+                    smtpClient.EnableSsl <- true
+                    let mail = new MailMessage()
+                    mail.From <- MailAddress(Settings.OwnerEmail,"Capri Island Tour")
+                    mail.To.Add(form.Email)
+                    mail.Subject <- "cupon"
+                    // mail.IsBodyHtml <- true
+
+                    let bitmapImage = new Bitmap(cuponImg)
+                    
+                    // let attachment = new Attachment(bigtapImage,Mime.MediaTypeNames.Image.Tiff)
+                    // let outFile =  new System.IO.StreamWriter("out.bmp")
+
+                    // bitmapImage.Save("out.bmp")
+                    bitmapImage.Save(cupon.CuponGuid.ToString()+".bmp")
+                
+                    // outFile.Write(cuponImg.ToArray())
+                    // outFile.Flush()
+
+                    let attachment = new Attachment(cupon.CuponGuid.ToString()+".bmp")
+                    
+                    // let attachment = new Attachment(cuponImg,Mime.ContentType)
+
+                    mail.Attachments.Add(attachment)
+
+                    mail.Body <- "https://fioreseaexcursionscapri.com. Cupon richiesto in allegato valido per le seguenti date/orari :"  + cuponText + 
+                    "Here enclosed the personal cupon valid for the following dates/times. 
+                    Print it or show it when buying the ticket 
+                      "
+                        // <img src=\"data:image/bmp;base64,"+cuponQrCode64Encoded+"\" width=\"400\"/>"
+                    smtpClient.Send(mail)
+                    LiteDb.updateCupon (cupon) |> ignore
                 }
-
-
-            // let _ = Async.Start(sendEmail)
-
-            let _ = Async.RunSynchronously sendEmail
-
-            Redirection.FOUND Path.home
-
+            try 
+                let _ = Async.RunSynchronously sendEmail
+                Redirection.FOUND Path.home
+            with err ->
+                log.Error ((err.ToString())+"errore nel tentativo di spedire il cupon")
+                Redirection.FOUND Path.Cupon.error
         )
     ]
 
@@ -1626,7 +1675,7 @@ let createPeriodicalExcursion =
             let _ = timesSlots |> List.iter (fun x -> LiteDb.createSlot excursion x )
             // let slots = LiteDb.findSlotOfAnExcursionByExcursionId excursion.Id
             let slots = LiteDb.findSlotsByExcursion excursion
-            log.Debug(sprintf "slots size %d " (Seq.length slots))
+            // log.Debug(sprintf "slots size %d " (Seq.length slots))
 
 
 
@@ -1662,11 +1711,15 @@ let imageCourseUploader id =
 let webPart = 
     choose [
 
+        // pathScan Path.Service.changeLocal (fun local -> (changeLocal local ))
+        pathScan Path.Service.changeLocal (fun lang_code -> (changeLocal lang_code))
+
         path Path.Admin.adminExcursions >=> adminExcursions
         // pathScan Path.Cupon.detectCupon (fun id -> admin (detectCupon id) )
         pathScan Path.Cupon.detectCupon (fun id -> admin (detectCuponRef id) )
 
         path Path.Cupon.error >=> error
+        path Path.Cupon.noMoreCuponByThisUser >=> noMoreCuponByThisUser
 
         pathScan Path.Cupon.makeCuponAsUsed (fun id -> admin (makeCuponAsUsed id))
 
@@ -1675,7 +1728,7 @@ let webPart =
 
         pathScan Path.Cupon.voidCupon (fun id -> admin (voidCupon id))
 
-        path Path.Cupon.lookForCuponPage >=> lookForCuponPage
+        pathScan Path.Cupon.lookForCuponPage (fun lang -> lookForCuponPage lang)
 
         pathScan Path.Admin.removePeriodicalExcursion (fun id -> admin (removePeriodicalExcursion id))
         path Path.Admin.createPeriodicalExcursion >=> createPeriodicalExcursion

@@ -13,7 +13,7 @@ open PayPalCheckoutSdk.Core
 open PayPalCheckoutSdk.Orders
 
 open BraintreeHttp
-
+open QRCoder
 
 
 
@@ -56,6 +56,32 @@ let PERCENT = "Percent"
 
 [<Literal>]
 let VAlUE = "Value"
+
+
+let stringToBase64Qr (inString:string) =
+    let qrGenerator = new QRCoder.QRCodeGenerator()
+    let qrCodeData = qrGenerator.CreateQrCode(inString,QRCodeGenerator.ECCLevel.Q)
+    let qrCode = new QRCode(qrCodeData)
+    let qrCodeImage = qrCode.GetGraphic(20)
+    let stream = new System.IO.MemoryStream()
+    qrCodeImage.Save(stream,qrCodeImage.RawFormat)
+    let arrayOfQrCode = stream.ToArray()
+    let encoded = System.Convert.ToBase64String arrayOfQrCode
+    encoded
+
+
+let stringToImageQr (inString: string) =
+    let qrGenerator = new QRCoder.QRCodeGenerator()
+    let qrCodeData = qrGenerator.CreateQrCode(inString,QRCodeGenerator.ECCLevel.Q)
+    let qrCode = new QRCode(qrCodeData)
+    let qrCodeImage = qrCode.GetGraphic(20)
+    let stream = new System.IO.MemoryStream()
+    qrCodeImage.Save(stream,qrCodeImage.RawFormat)
+    stream
+    // let arrayOfQrCode = stream.ToArray()
+    // let encoded = System.Convert.ToBase64String arrayOfQrCode
+    // encoded
+
 
 
 

@@ -1,13 +1,15 @@
 module DigitalCupons.Path
 
 
+
+type FloatPrint = PrintfFormat<(float -> string),unit,string,string,float>
+
 type StringFloat =  PrintfFormat<(string-> float -> string),unit,string,string,(string*float)>
 type StringDecimal =  PrintfFormat<(string-> decimal -> string),unit,string,string,(string*decimal)>
 type PrintFloat =  PrintfFormat<(float -> string),unit,string,string,float>
 
 type IntPath = PrintfFormat<(int -> string),unit,string,string,int>
 type Int2Path = PrintfFormat<(int -> int  -> string),unit,string,string,(int*int)>
-
 
 
 type IntPath3 = PrintfFormat< (int  -> int -> int ->  string),unit,string,string,(int*int*int)>
@@ -34,6 +36,11 @@ module Store =
 module Sandbox =
     let imageView = "/sandbox/imageView"
 
+
+module Service = 
+    let changeLocal:StrPath = "/service/local/%s"
+
+
 module Account =
     let logon = "/account/logon"
     let logoff = "/account/logoff"
@@ -54,11 +61,15 @@ module Cupon =
     let detectCupon: StrPath = "/cupon/detectCupon/%s"
     let displayQrOfCupon: IntPath = "/cupon/displayQrOfCupon/%d"
     let voidCupon: IntPath = "/cupon/voidCupon/%d"
-    let lookForCuponPage = "/cupon/lookForCuponPage"
+    // let lookForCuponPage = "/cupon/lookForCuponPage"
+
+    let lookForCuponPage:StrPath = "/cupon/lookForCuponPage/%s"
+
     let claimCupon: IntPath = "/cupon/claimCupon/%d"
     let removeCupon: IntPath = "/cupon/removeCupon/%d"
     let makeCuponAsUsed: IntPath = "/cupon/makeCuponAsUsed/%d"
     let error = "/cupon/error"
+    let noMoreCuponByThisUser = "/cupon/noMoreCuponByThisUser"
 
 
 module Admin =

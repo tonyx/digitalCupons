@@ -298,7 +298,7 @@ let removeCupon(id:int) =
     cupons.delete <@ fun x -> x.Id = id @>
     
 let updateCupon(cupon: Cupon) =
-    log.Debug("update cupon: "+(cupon.ToString()))
+    log.Debug(sprintf " update cupon: %d " cupon.Id)
     cupons.Update(cupon)
 
 
@@ -883,6 +883,15 @@ let getUnclaimedCuponsWithSomSlotsStartingFrom (dateTime:DateTime)=
 
     availableCupon
 
+
+let thereAreActiveCuponByThisEmail email =
+    let now = System.DateTime.Now
+    let ajustedNow = Utils.adjustTime(now)
+    let cuponsByEmail = cupons.FindAll() |> Seq.filter (fun (x:Cupon) -> x.OwnerEmail.IsSome && x.OwnerEmail.Value = email ) 
+    let notUsed = cuponsByEmail |> Seq.filter (fun x -> not x.Used)
+    let futureSlots = notUsed |> Seq.map (fun (x:Cupon) -> x.Slots |> List.filter (fun (y:Slot) -> System.DateTime.Compare(y.DateTime,ajustedNow) >=0 ))
+    Seq.length futureSlots > 0
+    
 
 
 

@@ -8,6 +8,14 @@ open DigitalCupons.Form
 
 let resources = AutocompleteItems.Load("autocompleteItems.xml")
 
+type DecimalPrint = PrintfFormat<(decimal -> string),unit,string,string,decimal>
+
+let local = DigitalCupons.LocalSchema.Resource.Load ("resources-"+DigitalCupons.LocalSchema.Settings.Localization+".xml")
+let englishLocal = DigitalCupons.LocalSchema.Resource.Load ("resources-en.xml")
+let italianLocal = DigitalCupons.LocalSchema.Resource.Load ("resources-it.xml")
+
+let mapOfLocals = [("it",italianLocal);("en",englishLocal)] |> Map.ofList
+
 let em s = tag "em" [] [Text s]
 let cssLink href = link [ "href", href; " rel", "stylesheet"; " type", "text/css" ]
 let h2 s = tag "h2" [] [Text s]
@@ -60,7 +68,6 @@ let renderForm (layout : FormLayout<_>) =
                         field.Html layout.Form
                     ]
             ]
-
         yield submitInput layout.SubmitText
     ]
 
@@ -123,7 +130,6 @@ let editUser (user: LiteDb.User) =
                    ]
               SubmitText = "Inserisci" 
             }
-
     ]
 
 let createNewAccount message =
@@ -240,11 +246,7 @@ let detailedMenu (order: LiteDb.Order)(availableCourses: LiteDb.Courses list) (o
                 SubmitText = "cerca"
             }
         
-
         h2 "scegli tra i seguenti:"
-
-
-
 
         table
             [
@@ -258,12 +260,6 @@ let detailedMenu (order: LiteDb.Order)(availableCourses: LiteDb.Courses list) (o
                             | None -> (em "no image")
                         )
                     ]
-
-                    // td [(match menuItem.EncodedImage  with
-                    //         Some X -> (tag "img" [("src","data:image/bmp;base64, "+X);("width","100")][])
-                    //         | None -> (em "no image")
-                    //     )
-                    // ]
 
                     td [
                         (Text(match menuItem.Description with Some X -> " ("+ X + " ) " | _ -> ""))
@@ -300,6 +296,12 @@ let detailedMenu (order: LiteDb.Order)(availableCourses: LiteDb.Courses list) (o
 
         br []
 
+    ]
+
+let noMoreCuponByThisUser =
+    [
+        h2 "esiste gia' un cupon da usare associato a questo indirizzo di email. Non e' possibile ottenere un nuovo cupon 
+         prima che venga usato quello precedente"
     ]
 
 let error =
@@ -477,7 +479,7 @@ let aggregateViewWithCustomerScomposition nameQuantityPair =
 
 let adminExcursions (periodicalExcursions: LiteDb.PeriodicalExcursion list)=
     [
-        h2 "gestione corse"
+        h2 local.GestioneCorse
         br []
         (a Path.Admin.createPeriodicalExcursion) [] [Text("aggiugi nuova corsa periodica")]
         br []
@@ -514,18 +516,20 @@ let adminCupons =
     ]
 
 
-let lookForCuponPage (unclaimedCupons: LiteDb.Cupon list)=
+let lookForCuponPage  (unclaimedCupons: LiteDb.Cupon list) lang  =
     [
-        h2 "scegli il tuo cupon di sconto"
+        h2 mapOfLocals.[lang].PickupDiscount
 
         table [ for cupon in unclaimedCupons ->
-                    let slots = cupon.Slots |> List.sortBy (fun x -> x.DateTime) |>  List.map (fun x -> x.Excursion.Name+", "+x.DayOfWeek+" "+x.DateTime.ToString()) |>    List.fold (fun acc x -> acc+x) ""
+                    let slots = cupon.Slots |> List.sortBy (fun x -> x.DateTime) |>  List.map (fun x -> x.Excursion.Name+", "+x.DayOfWeek+" "+x.DateTime.ToString()+", ") |>    List.fold (fun acc x -> acc+x) ""
                     let discountKind = match cupon.Discount with 
-                        | LiteDb.Percentage X -> (sprintf "sconto percentuale %.2f %% " X)
-                        | LiteDb.Amount X -> (sprintf "sconto di  %.2f  sul totale " X)
+                        | LiteDb.Percentage X -> (sprintf ((DecimalPrint)(local.PercentageDiscount+" %.2f %% ")) X)
+                        | LiteDb.Amount X -> (sprintf ((DecimalPrint)(local.PriceReduction+"%.2f")) X)
                     tr [
-                        li [Text("cupon persone: "+(string)(cupon.NumberOfPeople)+ " con  "+ discountKind + " per slots:"+slots)]
-                        (a (sprintf Path.Cupon.claimCupon cupon.Id ) ["class","buttonX"] [Text "richiedi questo cupon"])
+                        td [
+                        li [Text((sprintf ((Path.IntPath)local.CuponForNumberOfPeople)   (cupon.NumberOfPeople))+ " for: "+slots+", offer: "+discountKind+". "  )]
+                        (a (sprintf Path.Cupon.claimCupon cupon.Id ) ["class","buttonX"] [Text mapOfLocals.[lang].ClaimThisCupon ])
+                        ]
                     ]
                 ]
     ]
@@ -533,7 +537,7 @@ let lookForCuponPage (unclaimedCupons: LiteDb.Cupon list)=
 
 let claimCupon (cupon:LiteDb.Cupon) =
     [
-        h2 "richiesta di cupon"
+        h2 local.CuponForm
 
         renderForm 
             { Form = Form.subscribeForCupon
@@ -554,7 +558,7 @@ let claimCupon (cupon:LiteDb.Cupon) =
     ]
 
 let home  userId role (welcomeMessage:LiteDb.WelcomeMessage option) nodeService   = [
-    h2 "gestione orari e offert "
+    h2 "gestione orari e cupon "
     br[]
 
     // (match welcomeMessage with | Some X -> h2 X.Message | _ -> h2 "")
@@ -575,8 +579,6 @@ let home  userId role (welcomeMessage:LiteDb.WelcomeMessage option) nodeService 
             a Path.Admin.adminExcursions [] [Text "gestione corse/orari  " ]
 
             // a Path.Account.usersList [] [Text "lista utenti  " ]
-            br []
-            br []
             // a Path.Account.createNewAccount [] [Text "aggiungi nuovo utente  " ]
             br []
             br []
@@ -587,13 +589,12 @@ let home  userId role (welcomeMessage:LiteDb.WelcomeMessage option) nodeService 
             br []
             br []
 
-            a Path.Cupon.lookForCuponPage [] [Text " visualizza pagina di ricerca dei cupon per clienti "]
+            a (sprintf Path.Cupon.lookForCuponPage "it") [] [Text " visualizza pagina di ricerca dei cupon per clienti "]
             br []
             br []
 
 
-
-            a Path.Account.manageQrCodeUsers [] [Text "aggiungi nuovo utente con url/qrcode  " ]
+            // a Path.Account.manageQrCodeUsers [] [Text "aggiungi nuovo utente con url/qrcode  " ]
             br []
             br []
             // a Path.Orders.allOrders [] [Text "archivio di tutti gli ordini " ]
@@ -616,7 +617,7 @@ let home  userId role (welcomeMessage:LiteDb.WelcomeMessage option) nodeService 
             br []
 
 
-            a Path.Admin.manageWelcomeMessage  [] [Text "gestione messaggio di benvenuto " ]
+            // a Path.Admin.manageWelcomeMessage  [] [Text "gestione messaggio di benvenuto " ]
 
         ]
 
@@ -679,8 +680,14 @@ let partUser (user : string option) =
         | Some user -> 
             yield Text (sprintf "Logged on as %s, " user)
             yield a Path.Account.logoff [] [Text "Log off"]
+            yield br[]
+            yield a (sprintf Path.Service.changeLocal "it") [] [Text "Italiano "]
+            yield a (sprintf Path.Service.changeLocal "en") [] [Text "English "]
         | None ->
             yield a Path.Account.logon [] [Text "Log on"]
+            yield br[]
+            yield a (sprintf Path.Service.changeLocal "it") [] [Text "Italiano "]
+            yield a (sprintf Path.Service.changeLocal "en") [] [Text "English "]
     ]
 
 let detectCupon msg validity  optionId  (isValidForNextSlot:bool) (lookedupCupon:LiteDb.Cupon option) = 
@@ -718,7 +725,7 @@ let viewCupons (allCupons:LiteDb.Cupon list) =
                 li [Text("cupon persone: "+(string)(cupon.NumberOfPeople)+ " con  "+ 
                     discountKind + " per slots:"+slots+ 
                     (match cupon.OwnerEmail with | Some X -> "email: richiedente "+X | _ -> "")+
-                    (" - usato: "+cupon.Used.ToString())   )]
+                    (" - " + (match cupon.Used with | false -> "non" | true ->"") +  " usato"  ))]
                 (a (sprintf Path.Cupon.displayQrOfCupon cupon.Id ) ["class","buttonX"] [Text "vedi"])
                 (a (sprintf Path.Cupon.removeCupon cupon.Id ) ["class","buttonX"] [Text "elimina"])
             ]
@@ -997,7 +1004,6 @@ let goToConfirmOrder (order: LiteDb.Order) (orderItems: LiteDb.OrderItem list) =
         br[]
         a (sprintf Path.Orders.confirmOrder order.Id ) ["class","buttonX"] [Text " clicca per confermare"]
         a (sprintf Path.Orders.payWithPayPal order.Id ) ["class","buttonX"] [Text " clicca per pagare con carta di credito"]
-
     ]
 
 let manageConfirmedOrder (order: LiteDb.Order) (orderItems: LiteDb.OrderItem list) =
@@ -1032,7 +1038,6 @@ let manageConfirmedOrder (order: LiteDb.Order) (orderItems: LiteDb.OrderItem lis
                     ]
                 SubmitText = "Conferma" 
              }
-
     ]
 
 let manageConfirmedOrderWithEmail (order: LiteDb.Order) (orderItems: LiteDb.OrderItem list) =
@@ -1112,7 +1117,6 @@ let editOrderRef (order: LiteDb.Order) (orderItems: LiteDb.OrderItem list) (cour
                                     Html = formInput (fun f -> <@ f.Comment @>) [] 
                                 }
                         ]
-
                       }
                     ]
                 SubmitText = "Aggiungi" 
@@ -1141,7 +1145,7 @@ let index  partUser  container =
         body [] [
             div ["id", "header"] [
                 tag "h1" [] [
-                    a Path.home [] [Text "Gestione orari e offerte"]
+                    a Path.home [] [Text "home"]
                 ]
                 partUser
             ]
