@@ -6,8 +6,6 @@
     <Platform Condition=" '$(Platform)' == '' ">x64</Platform>
     <ProjectGuid>{851EFE18-0D66-4834-8DD7-5824FB0B0A96}</ProjectGuid>
     <OutputType>Exe</OutputType>
-    <!-- <RootNamespace>FreeOrders</RootNamespace>
-    <AssemblyName>FreeOrders</AssemblyName> -->
     <RootNamespace>DigitalCupons</RootNamespace>
     <AssemblyName>DigitalCupons</AssemblyName>
     <TargetFrameworkVersion>v4.7.1</TargetFrameworkVersion>
@@ -171,6 +169,7 @@
     <Compile Include="AssemblyInfo.fs" />
     <None Include="packages.config" />
     <None Include="App.config" />
+    <Compile Include="LocalSchema.fs" />
     <Compile Include="Utils.fs" />
     <Compile Include="LiteDb.fs" />
     <compile Include="Samples.fs"/>
@@ -180,6 +179,15 @@
     <Compile Include="View.fs" />
     <Compile Include="App.fs" />
     <Content Include="localization_schema.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="resources-en.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="resources-it.xml">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="fioresea.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <Content Include="Site.css">
@@ -307,6 +315,7 @@
     </When>
   </Choose>
   <Choose>
+
     <When Condition="$(TargetFrameworkIdentifier) == '.NETFramework' And ($(TargetFrameworkVersion) == 'v4.6.1' Or $(TargetFrameworkVersion) == 'v4.6.2' Or $(TargetFrameworkVersion) == 'v4.6.3')">
       <ItemGroup>
         <Reference Include="System.ValueTuple">
