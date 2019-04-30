@@ -28,6 +28,7 @@ let withParam (key,value) path = sprintf "%s?%s=%s" path key value
 
 let home = "/"
 
+
 module Store =
 
     let backUrl = "backUrl"
@@ -64,12 +65,15 @@ module Cupon =
     // let lookForCuponPage = "/cupon/lookForCuponPage"
 
     let lookForCuponPage:StrPath = "/cupon/lookForCuponPage/%s"
+    let confirmCupon: StrPath = "/cupon/confirmCupon/%s"
 
     let claimCupon: IntPath = "/cupon/claimCupon/%d"
     let removeCupon: IntPath = "/cupon/removeCupon/%d"
     let makeCuponAsUsed: IntPath = "/cupon/makeCuponAsUsed/%d"
     let error = "/cupon/error"
     let noMoreCuponByThisUser = "/cupon/noMoreCuponByThisUser"
+
+    let cuponIsConfirmed = "/cupon/cuponIsConfirmed"
 
 
 module Admin =
@@ -81,6 +85,7 @@ module Admin =
     let cuponsForPeriodicalExcursion: IntPath = "/admin/cuponsForPeriodicalExcursion/%d"
     let cuponToSlots = "/admin/cuponsToSlots"
     let viewCupons = "/admin/viewCupons"
+    let viewUsedCupons = "/admin/viewUsedCupons"
 
 
 

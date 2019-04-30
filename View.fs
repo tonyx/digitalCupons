@@ -298,9 +298,17 @@ let detailedMenu (order: LiteDb.Order)(availableCourses: LiteDb.Courses list) (o
 
     ]
 
+
+let cuponIsConfirmed =
+    [
+        h2 "abbiamo confermato il coupon che e' stato spedito via email. Verificate la vostra inbox."
+
+        h2 "we confirmed the coupon and sent it by email. Check your inbox."
+    ]
+
 let noMoreCuponByThisUser =
     [
-        h2 "esiste gia' un cupon da usare associato a questo indirizzo di email. Non e' possibile ottenere un nuovo cupon 
+        h2 "esiste gia' un coupon da usare associato a questo indirizzo di email. Non e' possibile ottenere un nuovo cupon 
          prima che venga usato quello precedente"
     ]
 
@@ -507,12 +515,12 @@ let adminExcursions (periodicalExcursions: LiteDb.PeriodicalExcursion list)=
 
 let cuponToSlots =
     [
-        h2 "associazion cupon a slots"
+        h2 "associazion coupon a slots"
     ]
 
 let adminCupons = 
     [
-        h2 "gestione cupon digitali"
+        h2 "gestione coupon digitali"
     ]
 
 
@@ -538,7 +546,6 @@ let lookForCuponPage  (unclaimedCupons: LiteDb.Cupon list) lang  =
 let claimCupon (cupon:LiteDb.Cupon) =
     [
         h2 local.CuponForm
-
         renderForm 
             { Form = Form.subscribeForCupon
               Fieldsets =
@@ -555,10 +562,18 @@ let claimCupon (cupon:LiteDb.Cupon) =
                 ]
               SubmitText = "send"
             }
+        script ["type", "text/javascript"; "src", "https://www.google.com/recaptcha/api.js?render=6LcSBaEUAAAAAPZ73UaR5t2BriSj6B13grLo2M38" ] []
+        script [] [Raw("<script>
+  grecaptcha.ready(function() {
+      grecaptcha.execute('6LcSBaEUAAAAAPZ73UaR5t2BriSj6B13grLo2M38', {action: 'homepage'}).then(function(token) {
+         ...
+      });
+  });
+  </script>")]
     ]
 
 let home  userId role (welcomeMessage:LiteDb.WelcomeMessage option) nodeService   = [
-    h2 "gestione orari e cupon "
+    h2 "gestione orari e coupon "
     br[]
 
     // (match welcomeMessage with | Some X -> h2 X.Message | _ -> h2 "")
@@ -582,14 +597,19 @@ let home  userId role (welcomeMessage:LiteDb.WelcomeMessage option) nodeService 
             // a Path.Account.createNewAccount [] [Text "aggiungi nuovo utente  " ]
             br []
             br []
-            a Path.Admin.adminCupons [] [Text "inserisci nuovi cupon  "]
+            a Path.Admin.adminCupons [] [Text "inserisci nuovi coupon  "]
             br []
             br []
-            a Path.Admin.viewCupons [] [Text " visualizza cupon esistenti "]
+            a Path.Admin.viewCupons [] [Text " visualizza coupon esistenti "]
             br []
             br []
 
-            a (sprintf Path.Cupon.lookForCuponPage "it") [] [Text " visualizza pagina di ricerca dei cupon per clienti "]
+            a Path.Admin.viewUsedCupons [] [Text " visualizza coupon usati "]
+            br []
+            br []
+
+            a (sprintf Path.Cupon.lookForCuponPage "it") [] [Text " visualizza pagina di ricerca dei coupon per clienti "]
+
             br []
             br []
 
@@ -700,13 +720,13 @@ let detectCupon msg validity  optionId  (isValidForNextSlot:bool) (lookedupCupon
 
     let cuponIsValidForNextSlot =
         match isValidForNextSlot with
-        | true -> "cupon valido per la prossima tratta "+discountMessage
-        | false -> "cupon non valido per la prossima tratta"
+        | true -> "coupon valido per la prossima tratta "+discountMessage
+        | false -> "coupon non valido per la prossima tratta"
 
     [
-        h2 ("detect cupon: "+ msg+"\n"+cuponIsValidForNextSlot)
+        h2 ("detect coupon: "+ msg+"\n"+cuponIsValidForNextSlot)
         (match optionId with
-        | Some X -> (a (sprintf Path.Cupon.voidCupon X) [] [Text "invalia il cupon"])
+        | Some X -> (a (sprintf Path.Cupon.voidCupon X) [] [Text "invalia il coupon"])
         | None -> em "")
         
     ]
@@ -717,15 +737,20 @@ let viewCupons (allCupons:LiteDb.Cupon list) =
         h2 "cupon esistenti:"
 
         table [ for cupon in allCupons ->
-            let slots = cupon.Slots |> List.sortBy (fun x -> x.DateTime) |>  List.map (fun x -> x.Excursion.Name+", "+x.DayOfWeek+" "+x.DateTime.ToString()) |>    List.fold (fun acc x -> acc+x) ""
+            let slots = cupon.Slots |> List.sortBy (fun x -> x.DateTime) |>  List.map (fun x -> " "+x.Excursion.Name+", "+x.DayOfWeek+" "+x.DateTime.ToString()) |>    List.fold (fun acc x -> acc+x) ""
             let discountKind = match cupon.Discount with 
                 | LiteDb.Percentage X -> (sprintf "sconto percentuale %.2f %% " X)
                 | LiteDb.Amount X -> (sprintf "sconto di  %.2f  sul totale " X)
             tr [
-                li [Text("cupon persone: "+(string)(cupon.NumberOfPeople)+ " con  "+ 
+                li [Text("coupon persone: "+(string)(cupon.NumberOfPeople)+ " con  "+ 
+
+
                     discountKind + " per slots:"+slots+ 
                     (match cupon.OwnerEmail with | Some X -> "email: richiedente "+X | _ -> "")+
-                    (" - " + (match cupon.Used with | false -> "non" | true ->"") +  " usato"  ))]
+                    (" - " + (match cupon.Used with | false -> "non" | true ->"") +  " usato, "  )+""+
+                    "stato: "+(cupon.CuponState.ToString())
+                    )
+                    ]
                 (a (sprintf Path.Cupon.displayQrOfCupon cupon.Id ) ["class","buttonX"] [Text "vedi"])
                 (a (sprintf Path.Cupon.removeCupon cupon.Id ) ["class","buttonX"] [Text "elimina"])
             ]
@@ -1138,7 +1163,7 @@ let index  partUser  container =
     "<!DOCTYPE html><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">"+
     (html [] [
         head [] [
-            title [] "digital cupons"
+            title [] "digital coupons"
             cssLink "/Site.css?uyYXuz"
         ]
 

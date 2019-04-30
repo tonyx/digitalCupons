@@ -107,6 +107,8 @@ let session f =
 //     LiteDb.removeAllCupons()
 
 
+
+
 let html container =
     let result user =
         OK (View.index 
@@ -1183,13 +1185,19 @@ let makeCuponAsUsed id = warbler (fun _ ->
 type RecognizeCuponModel = {recognize: bool;serverAddress: string; 
     validSlotsTime: string; isValidCupon: bool;ownerEmail: 
     string;cuponId: int;suaveService: string;
-    nodeService: string }
+    nodeService: string;
+    discountType: string ;
+    numberOfPeople: int}
 
 let error = 
     View.error |> html
 
 let noMoreCuponByThisUser =
     View.noMoreCuponByThisUser |> html
+
+
+let cuponIsConfirmed =
+    View.cuponIsConfirmed |> html
 
 let detectCuponRef cuponGuidString = warbler (fun _ ->
     let lookedUpCupon = LiteDb.findCuponByGuid cuponGuidString
@@ -1210,6 +1218,18 @@ let detectCuponRef cuponGuidString = warbler (fun _ ->
 
     let cuponIsValid = match lookedUpCupon with | Some X -> not X.Used  | _ -> false
 
+    let discountType = match lookedUpCupon with | Some X -> 
+        match X.Discount  with
+            | LiteDb.Percentage Z -> sprintf "sconto percentuale: %.2f  %%" Z
+            | LiteDb.Amount Z -> sprintf "sconto sul totale: %.2f " Z
+        | _ -> ""
+
+    let numberOfPeople = match lookedUpCupon with 
+        | Some X -> 
+             X.NumberOfPeople 
+        | _ -> 0 
+
+
     let cuponContainsNextSlot =         
         match (lookedUpCupon,nextAvailableSlot) with
         | (Some X,Some Y) -> List.contains Y (X.Slots)
@@ -1217,7 +1237,8 @@ let detectCuponRef cuponGuidString = warbler (fun _ ->
 
     let myModel = {recognize = cuponContainsNextSlot;serverAddress=Settings.ServerAddress; 
         validSlotsTime = slotsValidityOfCupon; isValidCupon = cuponIsValid; ownerEmail = ownerEmail; 
-        cuponId=cuponId; suaveService = (Settings.SuaveService |> string); nodeService= (Settings.NodeService |> string)    }
+        cuponId=cuponId; suaveService = (Settings.SuaveService |> string); nodeService= (Settings.NodeService |> string);
+        discountType = discountType; numberOfPeople = numberOfPeople   }
     DotLiquid.page("recognizedCupon.html") myModel
 )
 
@@ -1259,7 +1280,6 @@ let adminCupons =
                 PickableSlots = slots; DateInit = form.DateInit; DateEnding = form.DateEnding}
 
             DotLiquid.page("assignCupon.html") newCuponGroup
-
 
 
             // Redirection.FOUND Path.home
@@ -1447,6 +1467,11 @@ let rec datesOfAnInterval (visitTime: System.DateTime) (startingDate:System.Date
     )
 
 
+let viewUsedCupons = warbler (fun _ ->
+    let allUsedCupons = LiteDb.getAllUsedCupons() |> Seq.toList
+    View.viewCupons allUsedCupons |> html
+)
+
 let viewCupons =  warbler (fun _ ->
         let allCupons = getAllValidCupons() |> Seq.toList
         View.viewCupons allCupons |> html 
@@ -1518,6 +1543,7 @@ let cuponToSlots = warbler (fun x ->
 
     [1 .. numberOfCupons] |> List.iter (fun _ -> (
         let guid = Guid.NewGuid()
+        let confirmationGuid = Guid.NewGuid()
         
         // let qrGeneraor = new QRCoder.QRCodeGenerator()
         // let qrCodeData = qrGeneraor.CreateQrCode(guid.ToString(),QRCodeGenerator.ECCLevel.Q)
@@ -1529,7 +1555,7 @@ let cuponToSlots = warbler (fun x ->
         // // let arrayOfQrCode = stream.ToArray()
 
         
-        createCupon numberOfPeople theDiscount slotsForCupons guid) |> ignore
+        createCupon numberOfPeople theDiscount slotsForCupons guid confirmationGuid ) |> ignore
         
         )
 
@@ -1548,23 +1574,34 @@ let cuponToSlots = warbler (fun x ->
 // let creatSlotsOfExcursion (excursion:LiteDb.PeriodicalExcursion) =
 
 let splitToLines (inString:string) =
-    let charactersForLine = 70
+    let charactersForLine = 110
     let numberOfLines = inString.Length / charactersForLine + 1
     let toReturn =  Array.init<string> numberOfLines (fun index -> (if (index<numberOfLines-1) then inString.Substring(index*charactersForLine,charactersForLine) else inString.Substring(index*charactersForLine) ))
     toReturn
 
 
-
+type PreviewCuponDataModel = {DiscountText: string; SlotText: string; NumberOfPeople: int}
 
 let claimCupon id =
     let cupon = LiteDb.getCupon id
+    let discountText = match cupon.Discount with 
+        | LiteDb.Percentage X -> sprintf "riduzione del %.2f %%" X
+        | LiteDb.Amount X -> sprintf " reduction of € %.2f " X
+    let numberOfPeople = cupon.NumberOfPeople
+    let slotText =  cupon.Slots |> List.map (fun (x:LiteDb.Slot) -> x.DateTime) |> List.fold (fun acc x -> acc + (x.ToString())+" ;; " ) ""   
+    let reviewCuponData = {DiscountText = discountText; SlotText=slotText; NumberOfPeople=numberOfPeople}
+
     choose [
         GET >=> warbler ( fun _ ->
-            DotLiquid.page("claimCupon.html") {a=""}
+            DotLiquid.page("claimCupon.html") reviewCuponData //{a=""}
         )
         POST >=> bindToForm Form.subscribeForCupon (fun form ->
 
-            let cupon = {cupon with OwnerEmail = Some form.Email}
+            let now = System.DateTime.Now
+            // let adjustedNow = Utils.backAdjustTime(now)
+            let adjustedNow = now
+
+            let changedCupon = {cupon with OwnerEmail = Some form.Email; CuponState = LiteDb.IsUnconfirmed ; ClaimingTime = Some adjustedNow}
 
             let areadyAskedCupon = LiteDb.thereAreActiveCuponByThisEmail form.Email
 
@@ -1589,9 +1626,9 @@ let claimCupon id =
                     smtpClient.DeliveryMethod <- SmtpDeliveryMethod.Network
                     smtpClient.EnableSsl <- true
                     let mail = new MailMessage()
-                    mail.From <- MailAddress(Settings.OwnerEmail,"Capri Island Tour")
+                    mail.From <- MailAddress(Settings.OwnerEmail,"Fiore Sea Excursions")
                     mail.To.Add(form.Email)
-                    mail.Subject <- "cupon"
+                    mail.Subject <- "Please confirm the cupon"
 
                     let bitmapImage = new Bitmap(cuponImg)
 
@@ -1630,20 +1667,28 @@ let claimCupon id =
                     img3.Save(cupon.CuponGuid.ToString()+".bmp",System.Drawing.Imaging.ImageFormat.Bmp)
                     img3.Dispose()
 
-                    let attachment = new Attachment(cupon.CuponGuid.ToString()+".bmp")
+                    // let attachment = new Attachment(cupon.CuponGuid.ToString()+".bmp")
                     
-                    mail.Attachments.Add(attachment)
+                    // mail.Attachments.Add(attachment)
 
-                    mail.Body <- "https://fioreseaexcursionscapri.com. Cupon richiesto in allegato valido per le seguenti date/orari :"  + cuponText + 
-                    "Herewith enclosed the personal cupon valid for the following dates/times. 
-                    Print it or show it from your smartphone when buying the ticket . You have to make the qr code visibile.
-                    Please note that you have to keep this code secret, so avoid making photo and also avoid sharing it by email and by any social network eiher because someone may steal your rights in this way.\n
-                    
-                    Stampare il cupon o mostrarlo dal proprio smartphone nell'acquisto del biglietto. e' necesario che il codice qr sia ben visibile.
-                    E' importante che il codice resti segreto, quindi evitare di farne delle foto, di condividerlo via email o tramite social network perché in questo modo qualcuno potrebbe utilizzare ai vostri danni il diritto che avete acquisito"
+                    // let confirmtionLink = (Settings.SuaveService).ToString()+(sprintf Path.Cupon.confirmCupon (cupon.ConfirmationGuid.ToString()))
+                    let serviceLink = Settings.SuaveService.ToString();
+                    let serviceLinkAdjusted = serviceLink.Substring(0,serviceLink.Length-1)
+                    // let confirmtionLink = ((Settings.SuaveService).ToString()).Substring(0,) +(sprintf Path.Cupon.confirmCupon (cupon.ConfirmationGuid.ToString()))
+                    let confirmtionLink = serviceLinkAdjusted+(sprintf Path.Cupon.confirmCupon (cupon.ConfirmationGuid.ToString()))
+
+                    mail.Body <- "https://fioreseaexcursionscapri.com. Risulta che avete richiesto un cupon valido per le seguenti date/orari :"  + cuponText + "\n"+
+                    "Nel caso abbiate effettivamente richiesto il cupon, dovete confermarlo cliccando il link a seguire."+
+                    "Nel caso non abbiate chiesto nessun cupon, vi preghiamo di ignorare questa email e di accettare le le nostre scuse. "+
+
+                    "According to our records you recently asked for a cupon valid for the following dates/times."+cuponText+"\n" +
+                    "If you actually asked for the cupon, to get it you have to confirm it by following link soon. 
+                    If you received this email by mistake, do nothing and please accept our apologizes\n\n"+
+                    "Confirmation link:"+confirmtionLink+"\n\n"+
+                    "The link will expire in 15 minutes"
                       
                     smtpClient.Send(mail)
-                    LiteDb.updateCupon (cupon) |> ignore
+                    LiteDb.updateCupon (changedCupon) |> ignore
                 }
             try 
                 let _ = Async.RunSynchronously sendEmail
@@ -1664,6 +1709,94 @@ let voidCupon id =
 let removeCupon id = 
     LiteDb.removeCupon id |> ignore
     Redirection.FOUND Path.Admin.viewCupons
+
+let confirmCupon confiramtionGuid =
+    let possibleCupon = LiteDb.findCuponByConfirmationGuid confiramtionGuid
+    match possibleCupon with 
+        | Some theCupon ->
+
+            let cuponTimes = theCupon.Slots |> List.map (fun (x:LiteDb.Slot) -> x.DateTime)
+            let cuponText = cuponTimes |> List.fold (fun acc x -> acc + (x.ToString())+"; " ) ""
+
+            let sendEmail = 
+                async    {                
+                    let smtpClient = new SmtpClient(Settings.SmtpAddress,Settings.SmtpPort)
+                    smtpClient.Credentials <- System.Net.NetworkCredential(Settings.SmtpCredentialsName,Settings.SmtpCredentialsPassword)
+                    smtpClient.DeliveryMethod <- SmtpDeliveryMethod.Network
+                    smtpClient.EnableSsl <- true
+                    let mail = new MailMessage()
+                    mail.From <- MailAddress(Settings.OwnerEmail,"Fiore Sea Excursions")
+
+                    mail.To.Add(theCupon.OwnerEmail.Value)
+
+                    let cuponImg = Utils.stringToImageQr (theCupon.CuponGuid.ToString())
+
+                    mail.Subject <- "cupon" 
+                    let bitmapImage = new Bitmap(cuponImg)
+
+                    let templateImage = Image.FromFile("./cupon_template.png");
+
+                    let mergedImagesWidth = Math.Max(bitmapImage.Width,templateImage.Width)
+                    let mergedImagesHeight = bitmapImage.Height+templateImage.Height;
+
+                    let img3 = new Bitmap(mergedImagesWidth,mergedImagesHeight);
+                    let g = Graphics.FromImage(img3)
+                    g.Clear(Color.Black) 
+                    g.DrawImage(templateImage, Point(0,0)) 
+                    g.DrawImage(bitmapImage, Point(0,templateImage.Height))
+
+                    let arialFont = new System.Drawing.Font ("arial",(float32)10)
+
+
+                    let italianDiscountText = match theCupon.Discount with 
+                        | LiteDb.Amount X -> (sprintf " di € %.2f sul prezzo totale per n. %d persona/e" X theCupon.NumberOfPeople)
+                        | LiteDb.Percentage X -> (sprintf " del %.2f %% sul prezzo totale per n. %d persona/e " X theCupon.NumberOfPeople)
+
+                    let englishDiscountText = match theCupon.Discount with 
+                        | LiteDb.Amount X -> sprintf " of €  %.2f on the total price for n. %d people " X theCupon.NumberOfPeople
+                        | LiteDb.Percentage X -> sprintf " of %.2f %% on the total price for n. %d people " X theCupon.NumberOfPeople
+
+                    let textToDraw = splitToLines("Questo cupon da' diritto ad uno sconto "+italianDiscountText+" per una unica corsa a scelta nelle seguenti date/orari : "+cuponText)
+                    let englishTextToDraw = splitToLines("This cupon gives you the right of a discount "+ englishDiscountText+ " only for one excursion choosed from the following dates (DD/MM/YYYY) and times: "+cuponText)
+
+                    [ 0 .. textToDraw.Length - 1 ] |> List.iter (fun i -> g.DrawString(textToDraw.[i], arialFont, Brushes.Blue,70.0f,240.0f+(float32)i*20.0f))
+                    let offSet = textToDraw.Length
+
+                    [ 0 .. englishTextToDraw.Length  - 1 ] |> List.iter (fun i -> g.DrawString(englishTextToDraw.[i], arialFont, Brushes.Blue,70.0f,(240.0f)+(float32)(i+offSet+1)*20.0f))
+
+                    g.Dispose()
+                    templateImage.Dispose()
+                    bitmapImage.Dispose()
+                    img3.Save(theCupon.CuponGuid.ToString()+".bmp",System.Drawing.Imaging.ImageFormat.Bmp)
+                    img3.Dispose()
+
+                    let attachment = new Attachment(theCupon.CuponGuid.ToString()+".bmp")
+                    
+                    mail.Attachments.Add(attachment)
+
+                    mail.Body <- "https://fioreseaexcursionscapri.com. Cupon richiesto in allegato valido per le seguenti date/orari :"  + cuponText + 
+                    "Herewith enclosed the personal cupon valid for the following dates/times. 
+                    Print it or show it from your smartphone when buying the ticket . You have to make the qr code visibile.
+                    Please note that you have to keep this code secret, so avoid making photo and also avoid sharing it by email and by any social network eiher because someone may steal your rights in this way.\n
+                    
+                    Stampare il cupon o mostrarlo dal proprio smartphone nell'acquisto del biglietto. e' necesario che il codice qr sia ben visibile.
+                    E' importante che il codice resti segreto, quindi evitare di farne delle foto, di condividerlo via email o tramite social network perché in questo modo qualcuno potrebbe utilizzare ai vostri danni il diritto che avete acquisito"
+                      
+                    smtpClient.Send(mail)
+
+                    let newCupon = {theCupon with CuponState = LiteDb.IsConfirmed}
+                    LiteDb.updateCupon(newCupon) |> ignore
+                }
+           
+            try 
+                let _ = Async.RunSynchronously sendEmail
+                Redirection.FOUND Path.Cupon.cuponIsConfirmed
+            with err ->
+                log.Error ((err.ToString())+"errore nel tentativo di spedire il cupon")
+                Redirection.FOUND Path.Cupon.error
+        |  _ -> Redirection.FOUND Path.Cupon.error
+
+        // Redirection.FOUND Path.home
 
 let createPeriodicalExcursion = 
     choose [
@@ -1750,15 +1883,19 @@ let webPart =
 
         path Path.Cupon.error >=> error
         path Path.Cupon.noMoreCuponByThisUser >=> noMoreCuponByThisUser
+        path Path.Cupon.cuponIsConfirmed >=> cuponIsConfirmed
 
         pathScan Path.Cupon.makeCuponAsUsed (fun id -> admin (makeCuponAsUsed id))
 
         pathScan Path.Cupon.claimCupon (fun id -> (claimCupon id))
         pathScan Path.Cupon.removeCupon (fun id -> (removeCupon id))
+        pathScan Path.Cupon.confirmCupon (fun confirmationGuid -> (confirmCupon confirmationGuid))
+
 
         pathScan Path.Cupon.voidCupon (fun id -> admin (voidCupon id))
 
         pathScan Path.Cupon.lookForCuponPage (fun lang -> lookForCuponPage lang)
+        
 
         pathScan Path.Admin.removePeriodicalExcursion (fun id -> admin (removePeriodicalExcursion id))
         path Path.Admin.createPeriodicalExcursion >=> createPeriodicalExcursion
@@ -1767,6 +1904,8 @@ let webPart =
         path Path.Admin.cuponToSlots >=> cuponToSlots
 
         path Path.Admin.viewCupons >=> viewCupons
+
+        path Path.Admin.viewUsedCupons >=> viewUsedCupons
 
         pathScan Path.Cupon.displayQrOfCupon (fun id -> admin (displayQrOfCupon id))
 

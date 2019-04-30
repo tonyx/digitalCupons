@@ -17,8 +17,9 @@ let liteDb = new LiteDatabase("simple.db",mapper);
 
 type UserType = Admin | Ordinary | Customer
 type OrderState = Editing | Confirmed | Rejected | Accepted | Ongoing | Done | Archived
-type UnityOfMeasures = Pezzo | Kilo | Etto | Confezione
 
+type UnityOfMeasures = Pezzo | Kilo | Etto | Confezione
+type CuponState = IsAvailable | IsUnconfirmed | IsConfirmed | IsExpired
 
 // type DayOfWeek = Monday | Tuesday | Wedensday | Thursday | Friday | Saturday | Sunday
 
@@ -205,7 +206,6 @@ type Slot = {
 let slots = liteDb.GetCollection<Slot>("slots")
 
 
-
 [<CLIMutable>]
 type Cupon = {
     Id: int
@@ -215,16 +215,23 @@ type Cupon = {
     OwnerEmail: string option
     Used: bool
     CuponGuid: Guid
+    ConfirmationGuid: Guid
+    CuponState: CuponState
+    ClaimingTime: DateTime option
 }
 
 let cupons = liteDb.GetCollection<Cupon>("offers")
-
 
 let findCuponByGuid gui =
     let filterSearch = cupons.fullSearch <@ fun x -> x.CuponGuid @> (fun guid -> guid.ToString() = gui )
     filterSearch |> Seq.tryHead
 
+
+
     // cupon.findMany<@ fun x -> x.CuponGuid.ToString() = gui@> |> Seq.tryHead
+let findCuponByConfirmationGuid  confirmationGuid =
+    let filterSearch = cupons.fullSearch <@ fun x -> x.ConfirmationGuid @> (fun guid -> guid.ToString() = confirmationGuid )
+    filterSearch |> Seq.tryHead
 
 
 let createSlot (excursion: PeriodicalExcursion) (dateTime: DateTime) =
@@ -266,7 +273,7 @@ let getSlotsGivenIds (slotsIds: int list) =
 
 
 
-let createCupon numberOfpeople typeOfDiscount mySlots guid=
+let createCupon numberOfpeople typeOfDiscount mySlots guid confirmationGuid=
     log.Debug("creating a new cupon")
     let newCupon = {
         Id=0
@@ -276,6 +283,9 @@ let createCupon numberOfpeople typeOfDiscount mySlots guid=
         OwnerEmail = None
         Used = false
         CuponGuid = guid
+        ConfirmationGuid = confirmationGuid
+        CuponState = IsAvailable
+        ClaimingTime = None
     }
     cupons.Insert(newCupon)
 
@@ -284,10 +294,30 @@ let getCupon id =
     log.Debug("getting cupon")
     cupons.findOne <@ fun x -> x.Id = id@>
 
+let reinitCupon (x:Cupon) =
+    let newCupon = {x with CuponState = IsAvailable; OwnerEmail = None}
+    cupons.Update(newCupon)
+    ()
+
+let releaseUnConfirmedCupons() =
+    let now = System.DateTime.Now
+    let timedOutCupons = cupons.FindAll()  |> Seq.filter (fun (x:Cupon) -> x.CuponState = IsUnconfirmed) |> Seq.filter (fun (x:Cupon) -> System.DateTime.Compare(now,x.ClaimingTime.Value.AddMilliseconds(15.0))<=0)
+    timedOutCupons |> Seq.iter (fun x -> reinitCupon x) 
+
+
+
 let getAllValidCupons() =
-    log.Debug("get all cupons")
+    releaseUnConfirmedCupons()
+    log.Debug("get all  valid cupons")
     cupons.findMany <@ fun x -> x.Used = false @>
-    // cupon.FindAll()
+    // cupons.FindAll()
+
+let getAllUsedCupons() =
+    cupons.findMany <@ fun x -> x.Used = true @>
+
+let getAllCupons() =
+    log.Debug("get all cupons")
+    cupons.FindAll()
 
 let storeCupon (newCupon:Cupon) =
     log.Debug("storeCupon")
@@ -298,13 +328,13 @@ let removeCupon(id:int) =
     cupons.delete <@ fun x -> x.Id = id @>
     
 let updateCupon(cupon: Cupon) =
-    log.Debug(sprintf " update cupon: %d " cupon.Id)
+    log.Debug(sprintf " update cupon: %s " (cupon.ToString()))
     cupons.Update(cupon)
 
 
 let removeAllCupons() =
     log.Debug("removing all cupons")
-    let allCupons = getAllValidCupons()
+    let allCupons = getAllCupons()
     allCupons |> Seq.iter (fun x -> (removeCupon x.Id |> ignore))
 
 
@@ -373,8 +403,8 @@ let addDayToPeriodicalExcursion id (X:DayOfWeek) =
     let newPeriodicalExcursion = {periodicalExcursion with DaysOfWeek = X::periodicalExcursion.DaysOfWeek |> Set.ofList |> Set.toList }
     updatePeriodicalExcursion newPeriodicalExcursion
 
-let getAllCupons() =
-    cupons.FindAll()
+// let getAllCupons() =
+//     cupons.FindAll()
 
 let getSlotsOfAPeriodicalExcursion id =
     log.Debug("getting slots")
@@ -870,16 +900,26 @@ let uploadCourseImage imageName imagePath courseId =
     // let newCourse = {course with ImageName = Some imageName}
     // courses.Update(newCourse)
 
+// let reinitCupon (x:Cupon) =
+//     let newCupon = {x with CuponState = IsAvailable; OwnerEmail = None}
+//     cupons.Update(newCupon)
+//     ()
+
+// let releaseUnConfirmedCupons() =
+//     let now = System.DateTime.Now
+//     let timedOutCupons = cupons.FindAll()  |> Seq.filter (fun (x:Cupon) -> x.CuponState = IsUnconfirmed) |> Seq.filter (fun (x:Cupon) -> System.DateTime.Compare(now,x.ClaimingTime.Value.AddMilliseconds(15.0))>=0)
+//     timedOutCupons |> Seq.iter (fun x -> reinitCupon x) 
 
 
 let getUnclaimedCuponsWithSomSlotsStartingFrom (dateTime:DateTime)=
+    releaseUnConfirmedCupons()
     let adjustedDateTime = Utils.adjustTime(dateTime)
 
     let someSlotsAreStillOpen   (slots: Slot list) = 
         let openSlots = slots |> List.filter (fun x -> System.DateTime.Compare(x.DateTime,adjustedDateTime)>=0) |> List.length 
         openSlots > 0
 
-    let availableCupon = cupons.FindAll() |> Seq.filter (fun (x:Cupon) -> x.OwnerEmail.IsNone ) |>  Seq.filter (fun (x:Cupon) -> (someSlotsAreStillOpen x.Slots  )) 
+    let availableCupon = cupons.FindAll() |> Seq.filter (fun (x:Cupon) -> x.CuponState = IsAvailable ) |>  Seq.filter (fun (x:Cupon) -> (someSlotsAreStillOpen x.Slots  )) 
 
     availableCupon
 
