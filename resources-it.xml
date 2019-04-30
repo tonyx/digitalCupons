@@ -1,0 +1,10 @@
+<localization>
+    <ciao>ciao</ciao>
+    <gestioneCorse>gestione corse</gestioneCorse>
+    <pickupDiscount>scegli il tuo cupon di sconto</pickupDiscount>
+    <percentageDiscount>sconto percentuale </percentageDiscount>
+    <priceReduction>sconto di </priceReduction>
+    <cuponForNumberOfPeople>cupon valido per  %d  persone  </cuponForNumberOfPeople>
+    <claimThisCupon>richiedi questo cupon </claimThisCupon>
+    <cuponForm>form di richiesta invio cupon </cuponForm>
+</localization>
