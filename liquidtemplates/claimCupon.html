@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<html>
+
+<head>
+    <title>digital cupons</title>
+    <link href="/Site.css?uyYXuz" rel="stylesheet" type="text/css">
+</head>
+
+<!-- type PreviewCuponDataModel = {DiscountText: string; SlotText: string; NumberOfPeople: int} -->
+<!-- let reviewCuponData = {CuponText = discountText; SlotText=slotText; NumberOfPeople=numberOfPeople} -->
+
+<script src="https://www.google.com/recaptcha/api.js?render=6LcSBaEUAAAAAPZ73UaR5t2BriSj6B13grLo2M38"></script>
+<script>
+grecaptcha.ready(function() {
+    grecaptcha.execute('6LcSBaEUAAAAAPZ73UaR5t2BriSj6B13grLo2M38', {action: 'homepage'}).then(function(token) {
+    });
+});
+</script>
+
+
+
+<body>
+    <div id="header">
+        <h1><a href="/">home</a></h1>
+        <!-- <div id="part-user">Logged on as .., <a href="/account/logoff">Log off</a></div> -->
+    </div>
+    <div id="main">
+        <h2>richiesta di cupon</h2>
+        {{model.discount_text}} <br>
+        validita' in una delle seguenti date e orari: {{model.slot_text}} <br>
+        per un numero di persone pari a: {{model.number_of_people}} <br>
+
+        <form method="POST">
+            <fieldset>
+                <legend>Email</legend>
+                <div class="editor-label">Email adress</div>
+                <div class="autocomplete"><input name="Email" type="email" required=""></div>
+                you'll receive your cupon by email. (privacy note: we use email only to send you the cupon)
+            </fieldset><input type="submit" value="send">
+        </form>
+    </div>
+    <div id="footer">made by Tony_X - tonyx1@gmail.com (Luckysoft)</div>
+</body>
+
+</html>

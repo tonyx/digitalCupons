@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+    <head>
+            <title>Free Orders</title>
+            <link href="/Site.css" rel="stylesheet" type="text/css">
+    </head>
+    <body>
+        <div id="header">
+            <h1><a href="/">Ordinazioni on line</a></h1>
+            <div id="part-user">Logged on <a href="/account/logoff">Log off</a></div>
+        </div>
+        <div id="main">
+            <h2>aggiungi immagine</h2>
+            <form action="/courses/courseImageUpload/{{model.course_id}}" method="post" enctype="multipart/form-data">
+                <br>
+                <input type = "hidden" name="course_id" value="{{model.course_id}}">
+                
+                FILE <input type="file" name="imagefile"><br>
+                <br>
+                <input type="submit" value="Upload">
+            </form>
+        </div>
+        <div id="footer">made by Tony_X - tonyx1@gmail.com (Luckysoft)</div>
+    </body>
+</html>

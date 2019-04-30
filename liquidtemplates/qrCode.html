@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+        <head>
+                <title>Free Orders</title>
+                <link href="/Site.css" rel="stylesheet" type="text/css">
+        </head>
+        <h1>
+                codice qr per nuovo utente: {{model.plain_url}}
+        </h1>
+    <img src="data:image/bmp;base64, {{model.qr_base64_encoded_url}} " width="400"/>
+    <script>
+            document.write('<a href="' + document.referrer + '">Go Back</a>');
+    </script>
+</html>

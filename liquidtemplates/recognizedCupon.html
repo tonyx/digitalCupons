@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<html>
+    <head></head>
+    <body>
+        <audio id ="myAudio" ></audio>
+        <h2>
+
+        <!-- {{model.recognize}} -->
+
+        {% if model.valid_slots_time != "" %}
+            il cupon e' stato rilasciato per le seguenti date/orari:
+        {{model.valid_slots_time}}
+        {% endif %}
+        <br>
+
+        {% if model.recognize  == false %}
+            il cupon non e' utilizzabile per la prossima corsa
+        {% endif %}
+        <br>
+        {% if model.is_valid_cupon == false %} 
+            il cupon non risulta valido
+        {% endif %}
+      
+        <br>
+
+        {% if model.owner_email != "" %}
+            email del richiedente: {{model.owner_email}}
+        {% endif %}
+
+        {% if model.is_valid_cupon %}
+            il cupon e' valido
+        {% else %}
+            il cupon non e' valido
+        {% endif %}
+        <br>
+        Sconto previsto:        
+        {{model.discount_type}}
+        <br>
+        Numero di persone:
+        {{model.number_of_people}}
+        <br>
+
+
+        <br>
+        {% if model.is_valid_cupon == true %} 
+            <!-- <a href=http://{{model.server_address}}:8083/cupon/makeCuponAsUsed/{{model.cupon_id}}>invalida</a> -->
+            <a href={{model.suave_service}}cupon/makeCuponAsUsed/{{model.cupon_id}}>invalida</a>
+            {% else %}
+            the cupon is already used
+        {% endif %}
+
+        
+        </h2>    
+
+        <script>
+        var x = document.getElementById("myAudio");
+
+        x.src="https://{{model.server_address}}:443/magico.mp3";
+
+        {% if model.recognize == true and model.is_valid_cupon  %}
+            x.src="https://{{model.server_address}}:443/magico.mp3";
+        {% else %}    
+            x.src="https://{{model.server_address}}:443/noisecreations_SFX-NCFREE02_Radio-Police01-American.mp3";
+        {% endif%}
+
+        x.preload=true;
+        x.autoplay=true;
+        x.controls=true;
+        x.loop=false;
+
+        // wait(1000);
+        // alert('ecco');
+        
+        // sleep(1);
+
+        // window.location = "https://192.168.43.140:443/"
+        // window.location = "https://192.168.44.153:443/"
+        
+        </script>
+
+        <a href="https://{{model.server_address}}:443">scansiona nuovo codice</a>
+
+
+    </body>
+</html>
+
+
+
+<!-- var x = document.getElementById("myAudio");
+x.src=codes.get(insertedCode)+language+".mp3";
+x.preload=true;
+x.autoplay=true;
+x.controls=true;
+.loop=false; -->

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+        <head>
+                <title>Gestione cupon elettronici</title>
+                <link href="/Site.css" rel="stylesheet" type="text/css">
+        </head>
+        <h1>
+                codice qr per cupon
+        </h1>
+    <img src="data:image/bmp;base64, {{model.encoded_qr_image}} " width="400"/>
+    <script>
+            document.write('<a href="' + document.referrer + '">Go Back</a>');
+    </script>
+</html>

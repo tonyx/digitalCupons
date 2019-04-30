@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<html>
+    </head>
+        <title>Creazione cupon digitali</title>
+
+        <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+        <link href="/Site.css" rel="stylesheet" type="text/css" />
+        <script type="text/javascript" src="/jquery-3.1.1.min.js"></script>
+        <script type="text/javascript" src="/jquery-ui.js"></script>
+      
+        <!-- <script>
+        $( function() {
+          $( "#datepicker" ).datepicker();
+        } );
+        $( function() {
+          $( "#datepicker2" ).datepicker();
+        } );
+        </script> -->
+
+
+    </head>
+    <body class="containerX">
+
+        {%for item in model.coursewrappedlist %}
+            <option value ="{{item.course_id}}" >{{item.course_name}}</option>
+        {% endfor %}
+
+    <div id="header">
+            <h1><a href="/">home</a></h1>
+            <div id="part-user">Logged on <a href="/account/logoff">Log off</a></div>
+        </div>
+        <h2>Gestione cupon digitali: selezione periodo per slot</h2>
+        <form method="POST">
+                <fieldset>
+
+                    <label>tipo di sconto:</label>
+                    <select name="TypeOfDiscount">
+                        <option value="Percent">Percentuale</option>
+                        <option value="Value">Valore</option>
+                    </select>
+                    <br>
+                    <label>valore/percentuale</label>
+                    <input name="DiscountValue" type="number" value="10" required="true" min="0.01" step="0.01"/><br>
+                    <label>numero persone:</label>
+                    <input name="NumberOfPeople" required="true" value="1" type="number"/> <br>
+                    <label>numero di cupon:</label>
+                    <input name="NumberOfCupon" required="true" value="1" type="number"/>
+
+                </fieldset>
+                <fieldset>
+                    <legend>giorno inizio (incluso):</legend>
+                    <div class="editor-label">Data (MM/GG/AAAA)</div>
+                    <div>
+                    <input name="DateInit" type="date" required="true" id="datepicker">
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>giorno fine (incluso):</legend>
+                    <div class="editor-label">Data (MM/GG/AAAA)</div>
+                    <div>
+                    <input name="DateEnding" type="date" required="true" id="datepicker2">
+                    </div>
+                </fieldset>
+
+            <input type="submit" value="conferma selezione">
+        </form>
+    </body>
+</html>

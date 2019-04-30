@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<html>
+    </head>
+        <title>Creazione cupon digitali</title>
+
+        <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+        <link href="/Site.css" rel="stylesheet" type="text/css" />
+        <script type="text/javascript" src="/jquery-3.1.1.min.js"></script>
+        <script type="text/javascript" src="/jquery-ui.js"></script>
+      
+    </head>
+    <body class="containerX">
+            <div id="header">
+                    <h1><a href="/">Home</a></h1>
+                    <div id="part-user">Logged on <a href="/account/logoff">Log off</a></div>
+                    <h2>gestione orari e cupon </h2>
+            </div>
+
+        <form method="GET" action="/admin/cuponsToSlots">
+            <input type="hidden" name="numberOfPeople" value ="{{model.number_of_people}}"/>
+            <input type="hidden" name="typeOfDiscount" value ="{{model.discount_type}}"/>
+            <input type="hidden" name="discountValue" value ="{{model.discount_amount}}"/>
+            <input type="hidden" name="numberOfCupon" value ="{{model.number_of_cupons}}"/>
+            <input type="hidden" name="dateInit" value ="{{model.date_init}}"/>
+            <input type="hidden" name="dateEnding" value ="{{model.date_ending}}"/>
+            <table>
+            {%for item in model.pickable_slots %}
+                <tr>
+                    <td> {{item.date_time}} - {{item.day_of_week}}</td>
+                    <td><input type="checkbox" name="SLOT_{{item.id}}"/> </td>
+                    <td></td>
+                </tr>
+            {% endfor %}
+            </table>
+            <input type="submit" value="conferma assegnazione cupon">
+        </form>
+
+    </body>
+</html>

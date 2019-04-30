@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8">
+<html>
+    </head>
+        <title>Nuova corsa periodica</title>
+
+        <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+        <link href="/Site.css" rel="stylesheet" type="text/css" />
+        <script type="text/javascript" src="/jquery-3.1.1.min.js"></script>
+        <script type="text/javascript" src="/jquery-ui.js"></script>
+     
+
+        <!-- <script>
+        $( function() {
+          $( "#datepicker" ).datepicker();
+        } );
+        $( function() {
+          $( "#datepicker2" ).datepicker();
+        } );
+        </script> -->
+
+
+    </head>
+    <body class="containerX">
+
+    <div id="header">
+            <h1><a href="/">Home</a></h1>
+            <div id="part-user">Logged on <a href="/account/logoff">Log off</a></div>
+        </div>
+        <div id="main"><h2>Orari delle escursioni</h2></div>
+        <form method="POST">
+                <fieldset>
+                <label>nome corsa:</label><input name="Name" type="text" required=""/>
+                </fieldset>
+                <fieldset>
+                    <legend>primo giorno (incluso):</legend>
+                    <div class="editor-label">Data (MM/GG/AAAA)</div>
+                    <div>
+                    <input name="DateInit" type="date" required="" id="datepicker">
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>ultimo giorno (incluso):</legend>
+                    <div class="editor-label">Data (MM/GG/AAAA)</div>
+                    <div>
+                    <!-- <input name="DateEnding" type="text" required="" id="datepicker2"> -->
+                    <input name="DateEnding" type="date" required="" id="datepicker2">
+                    </div>
+                </fieldset>
+
+            <fieldset>
+                <legend>orario/giorni</legend>
+                <table>
+                    <tr>
+                    <td><label>orario:</label><input name="Time" type="time"/> </td>
+                    <td><label>posti</label><input name="Seats" type="number"/></td>
+                    <td><input type="checkbox"  name="Monday" >Lunedi</label></td>
+                    <td><input type="checkbox"  name="Tuesday" >Martedi</label></td>
+                    <td><input type="checkbox"  name="Wednesday" >Mercoledi'</label></td>
+                    <td><input type="checkbox"  name="Thursday" >Giovedi'</label></td>
+                    <td><input type="checkbox"  name="Friday">Venerdi'</label></td>
+                    <td><input type="checkbox"  name="Saturday" >Sabato</label></td>
+                    <td><input type="checkbox"  name="Sunday" >Domenica</label></td>
+                </table>
+            </fieldset>
+            <input type="submit" value="Aggiungi">
+        </form>
+    </body>
+</html>
