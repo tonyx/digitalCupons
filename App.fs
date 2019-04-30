@@ -19,6 +19,7 @@ open System.Net.Mail
 open FSharp.Configuration
 open QRCoder
 
+
 open LiteDB
 open LiteDB.FSharp
 open LiteDB.FSharp.Linq
@@ -125,8 +126,6 @@ let html container =
 let home (userLoggedOnSession:UserLoggedOnSession) = warbler (fun _ ->
     let welcomeMessage = LiteDb.getCurrentMessages() |> List.tryHead
     View.home userLoggedOnSession.UserId userLoggedOnSession.Role welcomeMessage Settings.NodeService  |> html)
-
-
 
 
 let bindToForm form handler =
@@ -1205,7 +1204,7 @@ let detectCuponRef cuponGuidString = warbler (fun _ ->
         | Some X -> match X.OwnerEmail with | Some Y -> Y | _ -> ""
         | _ -> ""
 
-    let slotsValidityOfCupon = slotsForCupon |> List.fold (fun acc x -> acc + (x.DateTime).ToString()) ""
+    let slotsValidityOfCupon = slotsForCupon |> List.fold (fun acc x -> acc + (x.DateTime).ToString()+" ") ""
 
     let cuponId = match lookedUpCupon with | Some X -> X.Id | _ -> -1
 
@@ -1548,6 +1547,15 @@ let cuponToSlots = warbler (fun x ->
 
 // let creatSlotsOfExcursion (excursion:LiteDb.PeriodicalExcursion) =
 
+let splitToLines (inString:string) =
+    let charactersForLine = 70
+    let numberOfLines = inString.Length / charactersForLine + 1
+    let toReturn =  Array.init<string> numberOfLines (fun index -> (if (index<numberOfLines-1) then inString.Substring(index*charactersForLine,charactersForLine) else inString.Substring(index*charactersForLine) ))
+    toReturn
+
+
+
+
 let claimCupon id =
     let cupon = LiteDb.getCupon id
     choose [
@@ -1558,25 +1566,21 @@ let claimCupon id =
 
             let cupon = {cupon with OwnerEmail = Some form.Email}
 
-
             let areadyAskedCupon = LiteDb.thereAreActiveCuponByThisEmail form.Email
 
             if (areadyAskedCupon) then
                 Redirection.FOUND Path.Cupon.noMoreCuponByThisUser
             else  
-            
-            // must update only if email is sent
-            LiteDb.updateCupon (cupon) |> ignore
+
             let cuponQrCode64Encoded = Utils.stringToBase64Qr (cupon.CuponGuid.ToString())
             let cuponImg = Utils.stringToImageQr (cupon.CuponGuid.ToString())
 
-// <img src="data:image/bmp;base64, {{model.qr_base64_encoded_url}} " width="400"/>
-            // remove spooled bmp files
             let filesToBeRemoved = System.IO.Directory.GetFiles(".","*.bmp")
             let _ = filesToBeRemoved |> Array.iter  (fun x -> System.IO.File.Delete(x))
 
             let cuponTimes = cupon.Slots |> List.map (fun (x:LiteDb.Slot) -> x.DateTime)
-            let cuponText = cuponTimes |> List.fold (fun acc x -> acc + (x.ToString())+", " ) ""
+
+            let cuponText = cuponTimes |> List.fold (fun acc x -> acc + (x.ToString())+"; " ) ""
 
             let sendEmail = 
                 async {
@@ -1588,30 +1592,56 @@ let claimCupon id =
                     mail.From <- MailAddress(Settings.OwnerEmail,"Capri Island Tour")
                     mail.To.Add(form.Email)
                     mail.Subject <- "cupon"
-                    // mail.IsBodyHtml <- true
 
                     let bitmapImage = new Bitmap(cuponImg)
-                    
-                    // let attachment = new Attachment(bigtapImage,Mime.MediaTypeNames.Image.Tiff)
-                    // let outFile =  new System.IO.StreamWriter("out.bmp")
 
-                    // bitmapImage.Save("out.bmp")
-                    bitmapImage.Save(cupon.CuponGuid.ToString()+".bmp")
-                
-                    // outFile.Write(cuponImg.ToArray())
-                    // outFile.Flush()
+                    let templateImage = Image.FromFile("./cupon_template.png");
+
+                    let mergedImagesWidth = Math.Max(bitmapImage.Width,templateImage.Width)
+                    let mergedImagesHeight = bitmapImage.Height+templateImage.Height;
+
+                    let img3 = new Bitmap(mergedImagesWidth,mergedImagesHeight);
+                    let g = Graphics.FromImage(img3)
+                    g.Clear(Color.Black) 
+                    g.DrawImage(templateImage, Point(0,0)) 
+                    g.DrawImage(bitmapImage, Point(0,templateImage.Height))
+
+                    let arialFont = new System.Drawing.Font ("arial",(float32)15)
+
+                    let italianDiscountText = match cupon.Discount with 
+                        | LiteDb.Amount X -> (sprintf " di € %.2f sul prezzo totale per n. %d persona/e" X cupon.NumberOfPeople)
+                        | LiteDb.Percentage X -> (sprintf " del %.2f %% sul prezzo totale per n. %d persona/e " X cupon.NumberOfPeople)
+
+                    let englishDiscountText = match cupon.Discount with 
+                        | LiteDb.Amount X -> sprintf " of €  %.2f on the total price for n. %d people " X cupon.NumberOfPeople
+                        | LiteDb.Percentage X -> sprintf " of %.2f %% on the total price for n. %d people " X cupon.NumberOfPeople
+
+                    let textToDraw = splitToLines("Questo cupon da' diritto ad uno sconto "+italianDiscountText+" per una unica corsa a scelta nelle seguenti date/orari : "+cuponText)
+                    let englishTextToDraw = splitToLines("This cupon gives you the right of a discount "+ englishDiscountText+ " only for one excursion choosed from the following dates (DD/MM/YYYY) and times: "+cuponText)
+
+                    [ 0 .. textToDraw.Length - 1 ] |> List.iter (fun i -> g.DrawString(textToDraw.[i], arialFont, Brushes.Blue,70.0f,240.0f+(float32)i*20.0f))
+                    let offSet = textToDraw.Length
+
+                    [ 0 .. englishTextToDraw.Length  - 1 ] |> List.iter (fun i -> g.DrawString(englishTextToDraw.[i], arialFont, Brushes.Blue,70.0f,(240.0f)+(float32)(i+offSet+1)*20.0f))
+
+                    g.Dispose()
+                    templateImage.Dispose()
+                    bitmapImage.Dispose()
+                    img3.Save(cupon.CuponGuid.ToString()+".bmp",System.Drawing.Imaging.ImageFormat.Bmp)
+                    img3.Dispose()
 
                     let attachment = new Attachment(cupon.CuponGuid.ToString()+".bmp")
                     
-                    // let attachment = new Attachment(cuponImg,Mime.ContentType)
-
                     mail.Attachments.Add(attachment)
 
                     mail.Body <- "https://fioreseaexcursionscapri.com. Cupon richiesto in allegato valido per le seguenti date/orari :"  + cuponText + 
-                    "Here enclosed the personal cupon valid for the following dates/times. 
-                    Print it or show it when buying the ticket 
-                      "
-                        // <img src=\"data:image/bmp;base64,"+cuponQrCode64Encoded+"\" width=\"400\"/>"
+                    "Herewith enclosed the personal cupon valid for the following dates/times. 
+                    Print it or show it from your smartphone when buying the ticket . You have to make the qr code visibile.
+                    Please note that you have to keep this code secret, so avoid making photo and also avoid sharing it by email and by any social network eiher because someone may steal your rights in this way.\n
+                    
+                    Stampare il cupon o mostrarlo dal proprio smartphone nell'acquisto del biglietto. e' necesario che il codice qr sia ben visibile.
+                    E' importante che il codice resti segreto, quindi evitare di farne delle foto, di condividerlo via email o tramite social network perché in questo modo qualcuno potrebbe utilizzare ai vostri danni il diritto che avete acquisito"
+                      
                     smtpClient.Send(mail)
                     LiteDb.updateCupon (cupon) |> ignore
                 }

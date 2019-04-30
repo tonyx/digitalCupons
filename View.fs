@@ -358,7 +358,7 @@ let manageWelcomeMessage (welcomeMessages: LiteDb.WelcomeMessage list) (defaultW
 
 let addCommentToOrderAndChangeItsState orderId =
     [
-        h2 "cambia stato ad ordinei ordine"
+        h2 "cambia stato ad ordine"
     ]
 
 let addCourse message =
@@ -571,7 +571,7 @@ let home  userId role (welcomeMessage:LiteDb.WelcomeMessage option) nodeService 
     (if (role = "Admin") then
         p [] [
 
-            a (nodeService |> string)[] [Text "riconoscimento codice qr"]
+            a (nodeService |> string)[] [Text "riconoscimento codice qr (per smartphone con telecamera posteriore)"]
 
             br[]
             br[]
